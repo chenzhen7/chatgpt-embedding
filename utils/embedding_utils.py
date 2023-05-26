@@ -13,6 +13,8 @@ embedding_encoding = "cl100k_base"  # this the encoding for text-embedding-ada-0
 max_tokens = 300 # the maximum for text-embedding-ada-002 is 8191
 #加载cl100k_base编码，该编码设计用于ada-002模型
 tokenizer = tiktoken.get_encoding(embedding_encoding)
+apikey = "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"
+
 
 #中文的句子分割法
 def split_chinese(text):
@@ -40,7 +42,7 @@ def request_for_embedding(input,engine='text-embedding-ada-002'):
     # 设置请求头部信息
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + "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",
+        'Authorization': 'Bearer ' + apikey,
     }
 
     # 设置请求体数据
@@ -64,7 +66,7 @@ def request_for_danvinci003(prompt,temperature,max_tokens,top_p,frequency_penalt
     # 设置请求头部信息
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + "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",
+        'Authorization': 'Bearer ' + apikey,
     }
 
     data = {
@@ -84,6 +86,23 @@ def request_for_danvinci003(prompt,temperature,max_tokens,top_p,frequency_penalt
 
     return response.json()
 
+def request_for_ChatCompletion(messages,model='gpt-3.5-turbo',temperature=0,max_tokens=2048):
+    # 设置请求头部信息
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apikey
+    }
+
+    data = {
+        'messages' : messages,
+        'model' : model,
+        'temperature' : temperature,
+        'max_tokens' : max_tokens
+    }
+# 发送 POST 请求
+    response = requests.post('https://api.openai-proxy.com/v1/chat/completions', headers=headers, data=json.dumps(data))
+    
+    return response.json()
 
 
 #函数将文本分割为最大数量的标记块

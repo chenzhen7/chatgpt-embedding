@@ -11,14 +11,14 @@ from flask import Flask, request, jsonify,send_file
 import os
 from flask_cors import CORS
 from pathlib import Path
-from utils.embedding_utils import request_for_danvinci003
+from utils.embedding_utils import request_for_danvinci003,request_for_ChatCompletion
 from file_to_scraped import file_add_embedding,read_text,files_to_embeddings
 import traceback
 
 
 app = Flask(__name__)
 CORS(app)
-
+apikey = "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"
 
 
 #请求我的代理获得embeding
@@ -27,7 +27,7 @@ def request_for_embedding(input,engine='text-embedding-ada-002'):
     # 设置请求头部信息
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + "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"
+        'Authorization': 'Bearer ' + apikey
     }
 
     # 设置请求体数据
@@ -41,22 +41,6 @@ def request_for_embedding(input,engine='text-embedding-ada-002'):
     
     return response.json()
 
-
-def request_for_ChatCompletion(messages,model):
-    # 设置请求头部信息
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + "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"
-    }
-
-    data = {
-        'messages' : messages,
-        'model' : model
-    }
-# 发送 POST 请求
-    response = requests.post('https://api.openai-proxy.com/v1/chat/completions', headers=headers, data=json.dumps(data))
-    
-    return response.json()
 
 
 """
@@ -129,20 +113,33 @@ def answer_question(
     if debug:
         print("Context:\n" + context)
         print("\n\n")
+    #gpt3的接口调用
+    # try:
+    #     #使用问题和上下文创建一个Completion
+    #     response = request_for_danvinci003(
+    #         prompt=f"根据下面的上下文回答问题，如果问题不能根据上下文回答, 说 \"很抱歉!我不知道\"\n\n上下文: {context}\n\n---\n\n问题: {question}\n回答:",
+    #         temperature=0,
+    #         max_tokens=2048,
+    #         top_p=1,
+    #         frequency_penalty=0,
+    #         presence_penalty=0,
+    #         stop=stop_sequence,
+    #         model='text-davinci-003',
+    #     )
 
+    #     res =  response["choices"][0]["text"]
+    # except Exception:
+    #     print(response)
+
+    # gpt 3.5
     try:
+        messages = [{"role": "user", "content": f"根据下面的上下文回答问题，如果不能根据上下文回答, 说 \"很抱歉!我不知道\"\n\n上下文: {context}\n\n---\n\n问题: {question}\n回答:"}]
         #使用问题和上下文创建一个Completion
-        response = request_for_danvinci003(
-            prompt=f"根据下面的上下文回答问题，如果问题不能根据上下文回答, 说 \"很抱歉!我不知道\"\n\n上下文: {context}\n\n---\n\n问题: {question}\n回答:",
-            temperature=0,
-            max_tokens=2048,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0,
-            stop=stop_sequence,
-            model='text-davinci-003',
+        response = request_for_ChatCompletion(
+            messages=messages, 
         )
-        res =  response["choices"][0]["text"]
+
+        res =  response["choices"][0]["message"]["content"]
     except Exception:
         print(response)
 

@@ -182,11 +182,21 @@ from file_to_scraped import file_add_embedding,read_text,files_to_embeddings
 import traceback
 
 
-file_count = 0
-total_size_mb = 0
-total_chars = 0
-for filename in os.listdir('./uploads'):
-    file_path = os.path.join('./uploads', filename)
-    if os.path.isfile(file_path):
-        file_count += 1
-        total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+# file_count = 0
+# total_size_mb = 0
+# total_chars = 0
+# for filename in os.listdir('./uploads'):
+#     file_path = os.path.join('./uploads', filename)
+#     if os.path.isfile(file_path):
+#         file_count += 1
+#         total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+from utils.embedding_utils import request_for_ChatCompletion
+
+messages = [{"role": "user", "content": "你好"}]
+        #使用问题和上下文创建一个Completion
+response = request_for_ChatCompletion(
+            messages=messages, 
+        )
+
+res =  response["choices"][0]["message"]["content"]
+print(res)
