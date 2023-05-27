@@ -77,14 +77,18 @@ def file_add_embedding(filename:str):
     texts=[]
 
     text = read_text('uploads/' + filename)
+    # 这行代码的目的是将文本 text 进行分词，并将分词后的词语通过空格连接成一个新的字符串。
+    text = text.replace(' ', '')
+    text = text.replace('\n\n', '\n')
     text = " ".join([w for w in list(jb.cut(text))])
     texts.append((filename, text))
 
     # 从文本列表中创建一个数据框。
+
     df = pd.DataFrame(texts, columns = ['fname', 'text'])
 
     #将文本列设置为删除换行符后的原始文本
-    df['text'] = df['fname'] + ". " + remove_newlines(df.text)
+    df['text'] = df['fname'] + ". " + df.text
     #不写入 直接添加到embedding
     # df.to_csv('processed/scraped.csv')
     tokenizer = tiktoken.get_encoding(embedding_encoding)
@@ -96,13 +100,13 @@ def file_add_embedding(filename:str):
     # 该函数将输入的文本转换为 标记（tokens），然后计算标记数并将其赋值给 n_tokens 列。因此，n_tokens 列中的每个元素都表示相应文件的标记数。
     df['n_tokens'] = df.text.apply(lambda x: len(tokenizer.encode(x)))
 
-    #使用直方图可视化每行标记数的分布
+    # 使用直方图可视化每行标记数的分布
     # df.n_tokens.hist()
     # plt.show()
 
     #缩短的文本列表
     shortened = []
-
+    
     #循环遍历数dataframe
     for row in df.iterrows():
 
@@ -117,24 +121,32 @@ def file_add_embedding(filename:str):
         #否则，将文本添加到缩短文本列表
         else:
             shortened.append( row[1]['text'] )
+    
+    # for i in shortened:
+    print(len(shortened))
 
     #再次可视化更新后的直方图有助于确认行是否已成功拆分为缩短的部分
     df = pd.DataFrame(shortened, columns = ['text'])
     df['n_tokens'] = df.text.apply(lambda x: len(tokenizer.encode(x)))
+    
+    # 使用直方图可视化每行标记数的分布
     # df.n_tokens.hist()
     # plt.show()
 
     
-    start = time.time()
+    start = time.time() 
+    # print(df['text'].head())
     df['embeddings'] = df.text.apply(lambda x: request_for_embedding(input=x, engine='text-embedding-ada-002')['data'][0]['embedding'])
+    
     end = time.time()
     print(f"生成embeddings花费时间:{end -start}")
 
-    old_df = pd.read_csv('processed/embeddings.csv', index_col=0)
-    # 将新的数据框添加到现有数据框中
-    new_df = pd.concat([old_df, df], ignore_index=True)
-
-    new_df.to_csv('processed/embeddings.csv')
+    # old_df = pd.read_csv('processed/embeddings.csv', index_col=0)
+    # # 将新的数据框添加到现有数据框中
+    # new_df = pd.concat([old_df, df], ignore_index=True)
+    # 只需要获取文件名部分而不包括扩展名
+    name_without_extension = os.path.splitext(filename)[0]
+    df.to_csv(os.path.join('./processed', name_without_extension + '.csv' ))
     # print(df.head())
 
 

@@ -192,11 +192,22 @@ import traceback
 #         total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
 from utils.embedding_utils import request_for_ChatCompletion
 
-messages = [{"role": "user", "content": "你好"}]
-        #使用问题和上下文创建一个Completion
-response = request_for_ChatCompletion(
-            messages=messages, 
-        )
+# messages = [{"role": "user", "content": "你好"}]
+#         #使用问题和上下文创建一个Completion
+# response = request_for_ChatCompletion(
+#             messages=messages, 
+#         )
 
-res =  response["choices"][0]["message"]["content"]
-print(res)
+# res =  response["choices"][0]["message"]["content"]
+# print(res)
+
+
+folder_path = './processed'
+for file_name in os.listdir(folder_path):
+    if file_name.endswith('.csv'):
+        file_path = os.path.join(folder_path, file_name)
+        # 读取 CSV 文件并将其添加到 df
+        df_temp = pd.read_csv(file_path)
+        df = pd.concat([df, df_temp], ignore_index=True)
+        # 打印合并后的 DataFrame
+print(df)

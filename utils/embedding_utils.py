@@ -6,15 +6,16 @@ import json
 import os
 import docx
 import PyPDF2
-
-
+import time
+import random
 embedding_model = "text-embedding-ada-002"
 embedding_encoding = "cl100k_base"  # this the encoding for text-embedding-ada-002
-max_tokens = 300 # the maximum for text-embedding-ada-002 is 8191
+
+max_tokens = 500 # the maximum for text-embedding-ada-002 is 8191
 #加载cl100k_base编码，该编码设计用于ada-002模型
 tokenizer = tiktoken.get_encoding(embedding_encoding)
-apikey = "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"
-
+apikey = "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"
+embedding_url = "https://api.openai-proxy.com/v1/embeddings"
 
 #中文的句子分割法
 def split_chinese(text):
@@ -42,6 +43,7 @@ def request_for_embedding(input,engine='text-embedding-ada-002'):
     # 设置请求头部信息
     headers = {
         'Content-Type': 'application/json',
+        'Connection': 'close',
         'Authorization': 'Bearer ' + apikey,
     }
 
@@ -53,14 +55,43 @@ def request_for_embedding(input,engine='text-embedding-ada-002'):
 
    
     for i in range(3):
+        
         try:# 发送 POST 请求
-            response = requests.post('https://api.openai-proxy.com/v1/embeddings', headers=headers, data=json.dumps(data),timeout=200)
+
+            print("post for embeddings")
+            response = requests.post(url=embedding_url, headers=headers,data=json.dumps(data),timeout=200)
+            # print("request_for_embedding 方法出错 \n response:" + response.text[:200])
+            resp_json = response.json()
+            time.sleep(5)
             break
         except Exception as e:
+            print("request_for_embedding 方法出错 \n response:" + response.text)
             print(e)
+            time.sleep(5)
             continue
 
-    return response.json()
+    return resp_json
+
+# def random_proxy():
+#     proxy_list = [
+#         '39.99.54.91:80',
+#         '183.247.221.119:30001',
+#         '114.231.42.156:8888',
+#         '182.139.111.228:9000',
+#         '121.207.92.141:8888',
+#         '183.236.232.160:8080'
+#     ]
+#     # 从代理 IP 列表中随机选择一个代理
+#     proxy_ip = random.choice(proxy_list)
+#     # 构建代理的字典格式
+#     proxies = {
+#         'http': f'http://{proxy_ip}',
+#         'https': f'http://{proxy_ip}'
+#     }
+#     return proxies
+
+
+
 
 def request_for_danvinci003(prompt,temperature,max_tokens,top_p,frequency_penalty,presence_penalty,stop,model):
     # 设置请求头部信息
@@ -82,6 +113,7 @@ def request_for_danvinci003(prompt,temperature,max_tokens,top_p,frequency_penalt
 
     # for i in range(3):
     # 发送 POST 请求
+    print("post for https://api.openai-proxy.com/v1/completions")
     response = requests.post('https://api.openai-proxy.com/v1/completions', headers=headers, data=json.dumps(data),timeout=100)
 
     return response.json()
@@ -100,6 +132,7 @@ def request_for_ChatCompletion(messages,model='gpt-3.5-turbo',temperature=0,max_
         'max_tokens' : max_tokens
     }
 # 发送 POST 请求
+    print("post for https://api.openai-proxy.com/v1/chat/completions")
     response = requests.post('https://api.openai-proxy.com/v1/chat/completions', headers=headers, data=json.dumps(data))
     
     return response.json()
@@ -123,8 +156,6 @@ def split_into_many(text, max_tokens = max_tokens):
 
     #在元组中循环连接在一起的句子和标记
     for sentence, token in zip(sentences, n_tokens):
-
-       
         if token > max_tokens:
             if len(chunk) > 0:
                 chunks.append(".".join(chunk) + ".")

@@ -11,35 +11,36 @@ from flask import Flask, request, jsonify,send_file
 import os
 from flask_cors import CORS
 from pathlib import Path
-from utils.embedding_utils import request_for_danvinci003,request_for_ChatCompletion
+from utils.embedding_utils import request_for_danvinci003,request_for_ChatCompletion,request_for_embedding
 from file_to_scraped import file_add_embedding,read_text,files_to_embeddings
 import traceback
 
 
 app = Flask(__name__)
 CORS(app)
-apikey = "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"
+apikey = "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"
 
 
-#请求我的代理获得embeding
-def request_for_embedding(input,engine='text-embedding-ada-002'):
+# #请求我的代理获得embeding
+# def request_for_embedding(input,engine='text-embedding-ada-002'):
 
-    # 设置请求头部信息
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apikey
-    }
+#     # 设置请求头部信息
+#     headers = {
+#         'Content-Type': 'application/json',
+#         'Authorization': 'Bearer ' + apikey
+#     }
 
-    # 设置请求体数据
-    data = {
-        'input': input,
-        'model': engine 
-    }
+#     # 设置请求体数据
+#     data = {
+#         'input': input,
+#         'model': engine 
+#     }
 
-    # 发送 POST 请求
-    response = requests.post('https://api.openai-proxy.com/v1/embeddings', headers=headers, data=json.dumps(data))
+#     # 发送 POST 请求
+#     print("post for https://api.openai-proxy.com/v1/embeddings")
+#     response = requests.post('https://api.openai-proxy.com/v1/embeddings', headers=headers, data=json.dumps(data))
     
-    return response.json()
+#     return response.json()
 
 
 
@@ -55,7 +56,11 @@ def create_context(
     # question = " ".join([w for w in list(jb.cut(question))])
     # print("question",question)
     #获取问题的embeddings
-    q_embeddings = request_for_embedding(input=question, engine='text-embedding-ada-002')['data'][0]['embedding']
+    try:
+        resp_embedding = request_for_embedding(input=question, engine='text-embedding-ada-002')
+        q_embeddings = resp_embedding['data'][0]['embedding']
+    except Exception :
+        print("resp_embedding = " + resp_embedding)
 
     end = time.time()
     print("获取问题的embeddings时间：",  end - start)
@@ -75,7 +80,6 @@ def create_context(
         #添加文本长度到当前长度
         cur_len += row['n_tokens'] + 4
 
-        
         #如果上下文太长，则中断
         if cur_len > max_len:
             print(f"上下文长度:{cur_len}")
@@ -85,7 +89,7 @@ def create_context(
         returns.append(row["text"].replace(' ',''))
 
     #返回上下文
-    return "\n\n###\n\n".join(returns)
+    return "\n".join(returns)
 
 
 def answer_question(
@@ -111,7 +115,7 @@ def answer_question(
     )
     #如果是调试，打印原始模型响应
     if debug:
-        print("Context:\n" + context)
+        print("Context:\n" + context[:100])
         print("\n\n")
     #gpt3的接口调用
     # try:
@@ -180,7 +184,18 @@ def get_ss():
     # 获取开始时间
     start = time.time()
 
-    df = pd.read_csv('./processed/embeddings.csv', index_col=0)
+    # df = pd.read_csv('./processed/embeddings.csv', index_col=0)
+    # 遍历 processed 文件夹中的所有文件
+    folder_path = './processed'
+    df = pd.DataFrame()
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('.csv'):
+            file_path = os.path.join(folder_path, file_name)
+            # 读取 CSV 文件并将其添加到 df
+            df_temp = pd.read_csv(file_path,index_col=0)
+            df = pd.concat([df, df_temp], ignore_index=True)
+            # 打印合并后的 DataFrame
+    # 这行代码的目的是将 'embeddings' 列中的字符串转换为对应的对象,然后将这些对象转换为 NumPy 数组
     df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
 
 
@@ -189,7 +204,7 @@ def get_ss():
 
     # 获取带json串请求的question参数传入的值
     question = request.json.get('question')
-    print(question)
+    print("question = " + question)
     # 判断请求传入的参数是否在字典里
     try:
         msg = answer_question(df, question=question,debug=True)
@@ -231,6 +246,7 @@ def upload_file():
         start = time.time()
         # 处理每个文件
         filename = file.filename
+        
 
         if file and allowed_file(filename):
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
