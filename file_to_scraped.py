@@ -72,11 +72,15 @@ def files_to_embeddings(floders_path:str):
     # df.head()
 
 #将文件转化为embeding后追加到embeding.csv中
-def file_add_embedding(filename:str):
+def file_add_embedding(upload_folder:str,embedding_folder:str,filename:str):
     # Create a list to store the text files
+    #文件路径
+    uploadpath = os.path.join(upload_folder,filename)
     texts=[]
+    #判断是否为excel表格
+    isExcel = filename.endswith('.xlsx')
 
-    text = read_text('uploads/' + filename)
+    text = read_text(uploadpath)
     # 这行代码的目的是将文本 text 进行分词，并将分词后的词语通过空格连接成一个新的字符串。
     text = text.replace(' ', '')
     text = text.replace('\n\n', '\n')
@@ -116,7 +120,7 @@ def file_add_embedding(filename:str):
 
         #如果标记的数量大于最大标记的数量，则使用split_into_many函数将文本分成多个较小的文本块，并将这些文本块添加到shortened列表中
         if row[1]['n_tokens'] > max_tokens:
-            shortened += split_into_many(row[1]['text'])
+            shortened += split_into_many(row[1]['text'],isExcel=isExcel,filename = filename)
         
         #否则，将文本添加到缩短文本列表
         else:
@@ -132,11 +136,17 @@ def file_add_embedding(filename:str):
     # 使用直方图可视化每行标记数的分布
     # df.n_tokens.hist()
     # plt.show()
-
     
     start = time.time() 
     # print(df['text'].head())
-    df['embeddings'] = df.text.apply(lambda x: request_for_embedding(input=x, engine='text-embedding-ada-002')['data'][0]['embedding'])
+    
+    # df['embeddings'] = df.text.apply(lambda x: request_for_embedding(input=x, engine='text-embedding-ada-002')['data'][0]['embedding'])
+    def process_text(x):
+        result = request_for_embedding(input=x, engine='text-embedding-ada-002')['data'][0]['embedding']
+        time.sleep(5)  # 等待5秒
+        return result
+
+    df['embeddings'] = df.text.apply(process_text)
     
     end = time.time()
     print(f"生成embeddings花费时间:{end -start}")
@@ -146,7 +156,10 @@ def file_add_embedding(filename:str):
     # new_df = pd.concat([old_df, df], ignore_index=True)
     # 只需要获取文件名部分而不包括扩展名
     name_without_extension = os.path.splitext(filename)[0]
-    df.to_csv(os.path.join('./processed', name_without_extension + '.csv' ))
+    if not os.path.exists(embedding_folder):
+        os.makedirs(embedding_folder)
+
+    df.to_csv(os.path.join(embedding_folder, name_without_extension + '.csv'))
     # print(df.head())
 
 

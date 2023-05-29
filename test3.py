@@ -202,12 +202,152 @@ from utils.embedding_utils import request_for_ChatCompletion
 # print(res)
 
 
-folder_path = './processed'
-for file_name in os.listdir(folder_path):
-    if file_name.endswith('.csv'):
-        file_path = os.path.join(folder_path, file_name)
-        # 读取 CSV 文件并将其添加到 df
-        df_temp = pd.read_csv(file_path)
-        df = pd.concat([df, df_temp], ignore_index=True)
-        # 打印合并后的 DataFrame
-print(df)
+# folder_path = './processed'
+# for file_name in os.listdir(folder_path):
+#     if file_name.endswith('.csv'):
+#         file_path = os.path.join(folder_path, file_name)
+#         # 读取 CSV 文件并将其添加到 df
+#         df_temp = pd.read_csv(file_path)
+#         df = pd.concat([df, df_temp], ignore_index=True)
+#         # 打印合并后的 DataFrame
+# print(df)
+
+import pandas as pd
+
+import pandas as pd
+import numpy as np
+import re
+
+import pandas as pd
+import numpy as np
+import re
+
+# def excelToMd(file_path, nan_replacement="-"):
+#     # 读取Excel文件
+#     df = pd.read_excel(file_path)
+    
+#     # 删除空的列
+#     df = df.dropna(axis=1, how='all')
+    
+#     # 处理未命名的列名
+#     df.columns = ["" if 'Unnamed:' in str(col) else col for col in df.columns]
+    
+#     # 获取表格的列名和数据
+#     columns = df.columns.tolist()
+#     data = df.values.tolist()
+#     index_column = df.iloc[:, 0].tolist()  # 获取第一列作为行名
+
+#     # 获取表格的数据
+#     data = df.iloc[1:, 1:].values.tolist()  # 排除第一行和第一列的数据
+    
+#     # 构建Markdown表格
+#     # markdown_table = ''
+#     # markdown_table = '|  | ' + ' | '.join(columns) + ' |\n'
+#     # markdown_table += '| --- ' + '| --- ' * len(columns) + ' |\n'
+#     formatted_row_data = []
+#     for i, row in enumerate(data):
+#           # 存储格式化后的每个单元格数据
+#         for col, cell in zip(columns, row):
+#             if pd.isnull(cell):
+#                 formatted_cell = nan_replacement  # 如果单元格为空，使用指定的替代字符串
+#             else:
+#                 formatted_cell = f'{index_column[i]} {col} {cell}'  # 连接行名、列名和单元格值
+#                 formatted_cell = re.sub(r'\s+', ' ', formatted_cell).strip()  # 使用正则表达式进行格式化处理，去除多余的空格
+                
+#             formatted_row_data.append(formatted_cell)  # 将格式化后的单元格数据添加到列表中
+        
+#         # formatted_row = ' | '.join(formatted_row_data)  # 将一行的格式化结果通过' | '连接起来
+#         # markdown_table += f'| {formatted_row} |\n'  # 将格式化的行添加到Markdown表格中
+
+    
+#     return ','.join(formatted_row_data)
+
+
+
+import pandas as pd
+import numpy as np
+import re
+import pandas as pd
+import numpy as np
+import re
+import pandas as pd
+import numpy as np
+import re
+
+def excelToMd(file_path, nan_replacement="-"):
+    # 读取Excel文件
+    df = pd.read_excel(file_path)
+    
+    # 删除空的列
+    df = df.dropna(axis=1, how='all')
+    
+    # 处理未命名的列名
+    df.columns = ["" if 'Unnamed:' in str(col) else col for col in df.columns]
+    
+    # 获取表格的列名和数据
+    columns_name = df.columns.tolist()[1:]
+    data = df.values.tolist()
+    rows_name = df.iloc[:, 0].tolist()  # 获取第一列作为行名
+    
+    
+    # 构建Markdown表格
+    # markdown_table = '| ' + ' | '.join(columns) + ' |\n'
+    # markdown_table += '| ' + ' | '.join(['---'] * len(columns)) + ' |\n'
+    
+    def clean_cell(cell):
+        # 使用正则表达式替换多个空白字符，并去除首尾空白
+        if not pd.isnull(cell):
+            return re.sub(r'\s+', ' ', str(cell)).strip()
+        else:
+            return nan_replacement
+
+    table = []
+    for (row,row_name) in zip(data,rows_name):
+        # 处理每一行的数据
+        row_data = []
+        #row[1:]表示每一行的第一个单元格去掉 ，即整张表的第一列不要
+        for (col,cell) in zip(columns_name, row[1:]):
+            if not pd.isnull(cell):
+                #格式化结果
+                cleaned_cell = clean_cell(cell)
+                # 连接行名、列名和单元格值
+                row_name = row_name.strip()
+                cleaned_cell = f'{row_name}-{col}-{cleaned_cell}'
+                row_data.append(cleaned_cell)
+        # 添加到 Markdown 表格中
+        # markdown_table += '| ' + ' | '.join(row_data) + ' |\n'
+        table += row_data
+
+
+    
+    return '\n'.join(table)
+
+
+markdown_table = excelToMd("01.xlsx")
+# 将Markdown表格写入文件
+with open('mk.txt', 'w', encoding='utf-8') as f:
+    f.write(markdown_table)
+
+print("Markdown表格已写入到mk.txt文件中。")
+
+
+
+
+
+def excelToTxt(file_path):
+    # 读取Excel文件并填充缺失值
+    df = pd.read_excel(file_path)
+    df = df.fillna('')  # 将缺失值替换为空字符串
+
+    # 转换为文本格式
+    text_data = df.to_string(index=False)
+
+    # 将文本内容写入文件
+    with open('excel.txt', 'w', encoding='utf-8') as f:
+        f.write(text_data)
+
+    print("Excel表格内容已写入到excel.txt文件中。")
+
+
+file_path = '01.xlsx'  # 替换为实际的Excel文件路径
+excelToTxt(file_path)

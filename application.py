@@ -18,7 +18,9 @@ import traceback
 
 app = Flask(__name__)
 CORS(app)
-apikey = "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"
+
+# apikey = "sk-7tlcceMpYdzU9zXDDpJvT3Bl
+# bkFJOgr0x2lDsktXcKJtFayH"
 
 
 # #请求我的代理获得embeding
@@ -60,7 +62,7 @@ def create_context(
         resp_embedding = request_for_embedding(input=question, engine='text-embedding-ada-002')
         q_embeddings = resp_embedding['data'][0]['embedding']
     except Exception :
-        print("resp_embedding = " + resp_embedding)
+        print(f"resp_embedding = {resp_embedding}")
 
     end = time.time()
     print("获取问题的embeddings时间：",  end - start)
@@ -89,7 +91,7 @@ def create_context(
         returns.append(row["text"].replace(' ',''))
 
     #返回上下文
-    return "\n".join(returns)
+    return "\n\n".join(returns)
 
 
 def answer_question(
@@ -115,7 +117,7 @@ def answer_question(
     )
     #如果是调试，打印原始模型响应
     if debug:
-        print("Context:\n" + context[:100])
+        print("Context:\n" + context)
         print("\n\n")
     #gpt3的接口调用
     # try:
@@ -144,10 +146,11 @@ def answer_question(
         )
 
         res =  response["choices"][0]["message"]["content"]
+        print(repr(res))
     except Exception:
         print(response)
 
-    return res
+    return res 
     
     # try:
         
@@ -222,11 +225,77 @@ def get_ss():
     }
     return jsonify(data)
 
+@app.route('/student/get_answer',methods=['post'])
+#json方式传参
+def get_ss_student():
+    # 获取开始时间
+    start = time.time()
+
+    # df = pd.read_csv('./processed/embeddings.csv', index_col=0)
+    # 遍历 processed 文件夹中的所有文件
+    folder_path = './processed'
+    df = pd.DataFrame()
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('.csv'):
+            file_path = os.path.join(folder_path, file_name)
+            # 读取 CSV 文件并将其添加到 df
+            df_temp = pd.read_csv(file_path,index_col=0)
+            df = pd.concat([df, df_temp], ignore_index=True)
+            # 打印合并后的 DataFrame
+
+    # df = pd.read_csv('./processed/embeddings.csv', index_col=0)
+    # 遍历 processed 文件夹中的所有文件
+    studentId = request.json.get('studentId')
+    # 遍历./processed/xxx文件夹下的CSV文件
+    # 遍历./processed/abc文件夹下的CSV文件（如果文件夹存在）
+    subfolder_path = os.path.join(folder_path, studentId)
+    if os.path.exists(subfolder_path) and os.path.isdir(subfolder_path):
+        for file_name in os.listdir(subfolder_path):
+            if file_name.endswith('.csv'):
+                file_path = os.path.join(subfolder_path, file_name)
+                # 读取 CSV 文件并将其添加到 df
+                df_temp = pd.read_csv(file_path, index_col=0)
+                df = pd.concat([df, df_temp], ignore_index=True)
+    else:
+        print(f"文件夹 {subfolder_path} 不存在")
+
+    
+    # 这行代码的目的是将 'embeddings' 列中的字符串转换为对应的对象,然后将这些对象转换为 NumPy 数组
+    df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
+
+
+    end = time.time()
+    print("读取embeddings.csv并转化为Numpy数组时间：",  end - start)
+
+    # 获取带json串请求的question参数传入的值
+    question = request.json.get('question')
+    print("question = " + question)
+    # 判断请求传入的参数是否在字典里
+    try:
+        msg = answer_question(df, question=question,debug=True)
+        code = 1000
+        decs = '成功'
+    except Exception as e:
+        traceback.print_exc()
+        code = 9000
+        msg = None
+        decs = 'openai服务返回异常'
+    data = {
+        'decs': decs,
+        'code': code,
+        'msg': msg
+    }
+    return jsonify(data)
+
+
+
 
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx'}
+
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx','xlsx'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 
 
 @app.route('/upload', methods=['POST'])
@@ -249,21 +318,57 @@ def upload_file():
         
 
         if file and allowed_file(filename):
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'],filename))
             filenames.append(filename)
 
-     
-        file_add_embedding(filename=filename)
+            embedding_folder_admin = './processed'
+            upload_folder_admin =  app.config['UPLOAD_FOLDER']
+        
+            file_add_embedding(filename=filename,embedding_folder=embedding_folder_admin,upload_folder=upload_folder_admin)
 
         end = time.time()
         spend = round(end - start,3)
 
         #线程释放
-     
-
         return jsonify({'spend': spend})
 
+@app.route('/student/upload', methods=['POST'])
+def upload_file_student():
 
+    if request.method == 'POST':
+        # 检查是否提交了文件
+        # 线程初始化
+    
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'})
+        
+        file = request.files['file']
+        studentId = request.values.get('studentId')
+        
+        filenames = []
+
+        start = time.time()
+        # 处理每个文件
+        filename = file.filename
+  
+
+        upload_folder_student =  os.path.join(app.config['UPLOAD_FOLDER'],studentId)
+        if not os.path.exists(upload_folder_student):
+            os.makedirs(upload_folder_student)
+
+        if file and allowed_file(filename):
+            file.save(os.path.join(upload_folder_student,filename))
+            filenames.append(filename)
+
+            embedding_folder_student = os.path.join('./processed',studentId)
+
+            file_add_embedding(upload_folder=upload_folder_student,embedding_folder=embedding_folder_student,filename=filename)
+
+        end = time.time()
+        spend = round(end - start,3)
+
+        #线程释放
+        return jsonify({'spend': spend})
 
 
 @app.route('/files', methods=['GET'])
@@ -278,6 +383,22 @@ def get_file_list():
     return jsonify({'files': file_list})
 
 
+@app.route('/student/files', methods=['POST'])
+def get_file_list_student():
+    #获得传入的studentId
+    studentId = request.json.get('studentId')
+    file_list = []
+    folder_path = './uploads'
+    student_path = os.path.join(folder_path, str(studentId))
+    if os.path.exists(student_path) and os.path.isdir(student_path):
+        for filename in os.listdir(student_path):
+            file_path = os.path.join(student_path, filename)
+            if os.path.isfile(file_path):
+                file_size_mb = round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+                file_list.append({'filename': filename, 'size': round(file_size_mb,3)})
+    
+    return jsonify({'files': file_list})
+
 
 @app.route('/download/<filename>', methods=['GET'])
 def download_file(filename):
@@ -287,23 +408,65 @@ def download_file(filename):
     else:
         return "File not found", 404
 
+@app.route('/student/<studentId>/download/<filename>', methods=['GET'])
+def download_file_student(filename,studentId):
+
+    upload_folder_student = os.path.join('./uploads',studentId)
+    upload_path_student = os.path.join(upload_folder_student,filename)
+
+    if os.path.exists(upload_folder_student) and os.path.isdir(upload_folder_student):
+        if os.path.isfile(upload_path_student):
+            return send_file(upload_path_student, as_attachment=True)
+        else:
+            return "File not found", 404
+
+
 
 @app.route('/delete/<filename>', methods=['DELETE'])
 def delete_file(filename):
 
     start = time.time()
+
     file_path = os.path.join('./uploads', filename)
+
+    name_without_extension = os.path.splitext(filename)[0]
+    processed_path = os.path.join('./processed', name_without_extension + '.csv')
 
     if os.path.isfile(file_path):
         os.remove(file_path)
-        files_to_embeddings('uploads/')
+        os.remove(processed_path)
         end = time.time()
         spend = round(end - start,3)
         return jsonify({'message': 'File {} deleted successfully.'.format(filename),'spend':spend})
     
     else:
         return "File not found", 404
-        
+
+
+@app.route('/student/<studentId>/delete/<filename>', methods=['DELETE'])
+def delete_file_student(filename,studentId):
+
+    start = time.time()
+    upload_folder_student = os.path.join('./uploads',studentId)
+    upload_path_student = os.path.join(upload_folder_student,filename)
+
+    # file_path = os.path.join('./uploads', filename)
+
+    name_without_extension = os.path.splitext(filename)[0]
+    processed_folder_student = os.path.join('./processed',studentId)
+    processed_path_student = os.path.join(processed_folder_student, name_without_extension + '.csv')
+
+    if os.path.isfile(upload_path_student):
+        os.remove(upload_path_student)
+        os.remove(processed_path_student)
+        end = time.time()
+        spend = round(end - start,3)
+        return jsonify({'message': 'File {} deleted successfully.'.format(filename),'spend':spend})
+    
+    else:
+        return "File not found", 404
+
+
 
 @app.route('/stats', methods=['GET'])
 def get_file_stats():
@@ -322,6 +485,33 @@ def get_file_stats():
   
     return jsonify({'embedding_num': file_count, 'embedding_size': round(total_size_mb,3),'embedding_textNum':total_chars})
     
+@app.route('/student/<studentId>/stats', methods=['GET'])
+def get_file_stats_student(studentId):
+  
+
+    file_count = 0
+    total_size_mb = 0
+    total_chars = 0
+    for filename in os.listdir('./uploads'):
+        file_path = os.path.join('./uploads', filename)
+        if os.path.isfile(file_path):
+            file_count += 1
+            total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+            total_chars +=  len(read_text('uploads/' + filename))
+
+    upload_folder = os.path.join('./uploads',studentId)
+
+    for filename in os.listdir(upload_folder):
+        file_path = os.path.join(upload_folder, filename)
+        if os.path.isfile(file_path):
+            file_count += 1
+            total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+            total_chars +=  len(read_text(file_path))
+    
+  
+    return jsonify({'embedding_num': file_count, 'embedding_size': round(total_size_mb,3),'embedding_textNum':total_chars})
+    
+
 
 app.run(host='0.0.0.0',port=8083,debug=True)
 
