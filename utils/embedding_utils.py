@@ -8,15 +8,19 @@ import docx
 import PyPDF2
 import time
 import pandas as pd
+import pdfplumber
+
+
 embedding_model = "text-embedding-ada-002"
 embedding_encoding = "cl100k_base"  # this the encoding for text-embedding-ada-002
 
 max_tokens = 500 # the maximum for text-embedding-ada-002 is 8191
 #加载cl100k_base编码，该编码设计用于ada-002模型
 tokenizer = tiktoken.get_encoding(embedding_encoding)
-# apikey = "sk-7tlcceMpYdzU9zXDDpJvT3Blbk
-# FJOgr0x2lDsktXcKJtFayH"
+apikey = "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"
 embedding_url = "https://api.openai-proxy.com/v1/embeddings"
+embedding_url_me = "https://43.163.223.60/v1/embeddings"
+gpt_3_url_me = "https://43.163.223.60/v1/chat/completions"
 
 #中文的句子分割法
 def split_chinese(text):
@@ -59,10 +63,12 @@ def request_for_embedding(input,engine='text-embedding-ada-002'):
         try:# 发送 POST 请求
 
             print("post for embeddings")
-            response = requests.post(url=embedding_url, headers=headers,data=json.dumps(data),timeout=200)
+            s = requests.session()
+            s.keep_alive = False
+            response = requests.post(url=embedding_url_me, headers=headers,data=json.dumps(data),timeout=200,verify=False)
             # print("request_for_embedding 方法出错 \n response:" + response.text[:200])
             resp_json = response.json()
-            
+            result = resp_json['data'][0]['embedding']
             break
         except Exception as e:
             print("request_for_embedding 方法出错 \n response:" + response.text)
@@ -70,7 +76,7 @@ def request_for_embedding(input,engine='text-embedding-ada-002'):
             time.sleep(5)
             continue
 
-    return resp_json
+    return result
 
 # def random_proxy():
 #     proxy_list = [
@@ -133,7 +139,7 @@ def request_for_ChatCompletion(messages,model='gpt-3.5-turbo',temperature=1,max_
     }
 # 发送 POST 请求
     print("post for https://api.openai-proxy.com/v1/chat/completions")
-    response = requests.post('https://api.openai-proxy.com/v1/chat/completions', headers=headers, data=json.dumps(data))
+    response = requests.post(gpt_3_url_me, headers=headers, data=json.dumps(data),verify=False)
     
     return response.json()
 
@@ -197,17 +203,19 @@ def split_into_many(text, max_tokens = max_tokens,isExcel = False,filename = '')
 
 def read_text(filepath):
     # 获取文件的绝对路径
+    # encoding='utf-8'
     file_path = os.path.abspath(filepath)
 
     if filepath.endswith('.pdf'):
-        with open(file_path, 'rb') as pdf_file:
-            pdf_reader = PyPDF2.PdfReader(pdf_file)
-            full_text = []
-            for page_num in range(len(pdf_reader.pages)):
-                page = pdf_reader.pages[page_num]
-                page_text = page.extract_text()
-                full_text.append(page_text)
-            return '\n'.join(full_text)
+        
+        with pdfplumber.open(file_path) as pdf:
+            text = ""
+            for page in pdf.pages:
+                text += page.extract_text()
+                
+        return text
+
+
     elif filepath.endswith('.docx'):
         # 打开文档
         doc = docx.Document(file_path)

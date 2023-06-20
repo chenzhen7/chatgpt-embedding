@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from utils.embedding_utils import split_into_many,request_for_embedding,read_text
 import time
+import traceback
+
 
 # embedding model parameters
 embedding_model = "text-embedding-ada-002"
@@ -142,8 +144,19 @@ def file_add_embedding(upload_folder:str,embedding_folder:str,filename:str):
     
     # df['embeddings'] = df.text.apply(lambda x: request_for_embedding(input=x, engine='text-embedding-ada-002')['data'][0]['embedding'])
     def process_text(x):
-        result = request_for_embedding(input=x, engine='text-embedding-ada-002')['data'][0]['embedding']
-        time.sleep(5)  # 等待5秒
+        for i in range(3):
+            try:
+                result = request_for_embedding(input=x, engine='text-embedding-ada-002')
+                break
+            except Exception as e:
+                traceback.print_exc()
+                print("\n-----------process_text出错--------------")
+                print(f"\n-----------result={result}--------------")
+
+                time.sleep(5)
+                continue
+                
+        # time.sleep(5)  # 等待5秒
         return result
 
     df['embeddings'] = df.text.apply(process_text)
@@ -159,7 +172,7 @@ def file_add_embedding(upload_folder:str,embedding_folder:str,filename:str):
     if not os.path.exists(embedding_folder):
         os.makedirs(embedding_folder)
 
-    df.to_csv(os.path.join(embedding_folder, name_without_extension + '.csv'))
+    df.to_csv(os.path.join(embedding_folder, name_without_extension + '.csv'),escapechar='\\')
     # print(df.head())
 
 

@@ -14,13 +14,14 @@ from pathlib import Path
 from utils.embedding_utils import request_for_danvinci003,request_for_ChatCompletion,request_for_embedding
 from file_to_scraped import file_add_embedding,read_text,files_to_embeddings
 import traceback
+import threading
+import chardet
 
-
+lock = threading.Lock()
 app = Flask(__name__)
 CORS(app)
 
-# apikey = "sk-7tlcceMpYdzU9zXDDpJvT3Bl
-# bkFJOgr0x2lDsktXcKJtFayH"
+apikey = "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"
 
 
 # #请求我的代理获得embeding
@@ -47,10 +48,10 @@ CORS(app)
 
 
 """
-    通过从数据框架(dataframe)中找到最相似的上下文来为问题创建上下文(prompt)
+    通过从数据框架(dataframe)中找到最相似的上下文来为问题创建上下文(prompt)，并且找到上下文是来自哪些文件，把这些文件的名字返回
 """
 def create_context(
-    question, df, max_len=1800, size="ada"
+    question, df, max_len=1800
 ):
     
     start = time.time()
@@ -60,7 +61,7 @@ def create_context(
     #获取问题的embeddings
     try:
         resp_embedding = request_for_embedding(input=question, engine='text-embedding-ada-002')
-        q_embeddings = resp_embedding['data'][0]['embedding']
+        q_embeddings = resp_embedding
     except Exception :
         print(f"resp_embedding = {resp_embedding}")
 
@@ -73,7 +74,8 @@ def create_context(
     end = time.time()
     print("获取每个embeddings的距离时间：",  end - start)
 
-    returns = []
+    context = []
+    filenames = []
     cur_len = 0
 
     #按距离排序，并将文本添加到上下文中，直到上下文太长
@@ -88,14 +90,19 @@ def create_context(
             break
         
         #否则将它添加到正在返回的上下文中
-        returns.append(row["text"].replace(' ',''))
+        context.append(row["text"].replace(' ',''))
+            # 检查是否存在'filename'列
+    
+        filenames.append(row["filename"])
+
+        
 
     #返回上下文
-    return "\n\n".join(returns)
+    return "\n\n##\n\n".join(context),filenames
 
 
 def answer_question(
-    df,
+    context,
     model="gpt-3.5-turbo",
     question="我是否可以在没有人工审核的情况下将模型输出发布到Twitter？",
     max_len=1500,
@@ -109,12 +116,7 @@ def answer_question(
 
     """
 
-    context = create_context(
-        question,
-        df,
-        max_len=max_len,
-        size=size,
-    )
+    
     #如果是调试，打印原始模型响应
     if debug:
         print("Context:\n" + context)
@@ -196,10 +198,13 @@ def get_ss():
             file_path = os.path.join(folder_path, file_name)
             # 读取 CSV 文件并将其添加到 df
             df_temp = pd.read_csv(file_path,index_col=0)
+            df_temp['filename'] = os.path.splitext(file_name)[0]
             df = pd.concat([df, df_temp], ignore_index=True)
             # 打印合并后的 DataFrame
+
     # 这行代码的目的是将 'embeddings' 列中的字符串转换为对应的对象,然后将这些对象转换为 NumPy 数组
     df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
+    print(df.head())  # 默认打印前5行
 
 
     end = time.time()
@@ -208,9 +213,20 @@ def get_ss():
     # 获取带json串请求的question参数传入的值
     question = request.json.get('question')
     print("question = " + question)
-    # 判断请求传入的参数是否在字典里
+ 
+
+    # 获得上下文信息并且找到上下文是来自哪些文件，把这些文件的名字返回
+    context,filenames = create_context(
+        question,
+        df,
+        max_len=1500,
+    )
+    filenames = list(set(filenames))
+    
+    print("filenames = " + ' '.join(filenames))
+
     try:
-        msg = answer_question(df, question=question,debug=True)
+        msg = answer_question(context, question=question,debug=True)
         code = 1000
         decs = '成功'
     except Exception as e:
@@ -218,12 +234,18 @@ def get_ss():
         code = 9000
         msg = None
         decs = 'openai服务返回异常'
+
     data = {
         'decs': decs,
         'code': code,
-        'msg': msg
+        'msg': msg,
+        'filenames':filenames
     }
+    print("data",data)
+
     return jsonify(data)
+
+
 
 @app.route('/student/get_answer',methods=['post'])
 #json方式传参
@@ -240,6 +262,7 @@ def get_ss_student():
             file_path = os.path.join(folder_path, file_name)
             # 读取 CSV 文件并将其添加到 df
             df_temp = pd.read_csv(file_path,index_col=0)
+            df_temp['filename'] = os.path.splitext(file_name)[0]
             df = pd.concat([df, df_temp], ignore_index=True)
             # 打印合并后的 DataFrame
 
@@ -255,6 +278,7 @@ def get_ss_student():
                 file_path = os.path.join(subfolder_path, file_name)
                 # 读取 CSV 文件并将其添加到 df
                 df_temp = pd.read_csv(file_path, index_col=0)
+                df_temp['filename'] = os.path.splitext(file_name)[0]
                 df = pd.concat([df, df_temp], ignore_index=True)
     else:
         print(f"文件夹 {subfolder_path} 不存在")
@@ -271,8 +295,16 @@ def get_ss_student():
     question = request.json.get('question')
     print("question = " + question)
     # 判断请求传入的参数是否在字典里
+    context,filenames = create_context(
+        question,
+        df,
+        max_len=1500,
+    )
+    filenames = list(set(filenames))
+    print("filenames = " + ' '.join(filenames))
+
     try:
-        msg = answer_question(df, question=question,debug=True)
+        msg = answer_question(context, question=question,debug=True)
         code = 1000
         decs = '成功'
     except Exception as e:
@@ -283,8 +315,10 @@ def get_ss_student():
     data = {
         'decs': decs,
         'code': code,
-        'msg': msg
+        'msg': msg,
+        'filenames':filenames
     }
+    print("data",data)
     return jsonify(data)
 
 
@@ -317,14 +351,24 @@ def upload_file():
         filename = file.filename
         
 
-        if file and allowed_file(filename):
+        if file and allowed_file(filename):     
             file.save(os.path.join(app.config['UPLOAD_FOLDER'],filename))
             filenames.append(filename)
 
             embedding_folder_admin = './processed'
             upload_folder_admin =  app.config['UPLOAD_FOLDER']
-        
-            file_add_embedding(filename=filename,embedding_folder=embedding_folder_admin,upload_folder=upload_folder_admin)
+
+            for i in range(3):
+                try:
+                    file_add_embedding(filename=filename,embedding_folder=embedding_folder_admin,upload_folder=upload_folder_admin)
+                    break
+                except Exception as e:
+                    traceback.print_exc()
+                    print("\n-----------file_add_embedding出错--------------")
+                    time.sleep(5)
+
+                    continue
+            threading.Thread(target=save_file_stats).start()
 
         end = time.time()
         spend = round(end - start,3)
@@ -361,8 +405,19 @@ def upload_file_student():
             filenames.append(filename)
 
             embedding_folder_student = os.path.join('./processed',studentId)
+         
+            for i in range(3):
+                try:     
+                    file_add_embedding(upload_folder=upload_folder_student,embedding_folder=embedding_folder_student,filename=filename)
+                    break
+                except Exception as e:
+                    traceback.print_exc()
+                    print("\n-----------file_add_embedding出错--------------")
+                    time.sleep(5)
 
-            file_add_embedding(upload_folder=upload_folder_student,embedding_folder=embedding_folder_student,filename=filename)
+                    continue
+            threading.Thread(target=save_file_stats_student, args=(studentId,)).start()      
+
 
         end = time.time()
         spend = round(end - start,3)
@@ -402,8 +457,15 @@ def get_file_list_student():
 
 @app.route('/download/<filename>', methods=['GET'])
 def download_file(filename):
-    file_path = os.path.join('./uploads', filename)
-    if os.path.isfile(file_path):
+
+    folder_path = './uploads'
+    
+    # 在目标文件夹中查找与提供的文件名匹配的文件
+    matching_files = [file for file in os.listdir(folder_path) if file.startswith(filename)]
+    
+    if len(matching_files) > 0:
+        # 使用匹配到的第一个文件进行下载
+        file_path = os.path.join(folder_path, matching_files[0])
         return send_file(file_path, as_attachment=True)
     else:
         return "File not found", 404
@@ -412,13 +474,23 @@ def download_file(filename):
 def download_file_student(filename,studentId):
 
     upload_folder_student = os.path.join('./uploads',studentId)
-    upload_path_student = os.path.join(upload_folder_student,filename)
-
     if os.path.exists(upload_folder_student) and os.path.isdir(upload_folder_student):
-        if os.path.isfile(upload_path_student):
-            return send_file(upload_path_student, as_attachment=True)
-        else:
-            return "File not found", 404
+        matching_files = [file for file in os.listdir(upload_folder_student) if file.startswith(filename)]
+        if len(matching_files) > 0:
+            upload_path_student = os.path.join(upload_folder_student,matching_files[0])
+            if os.path.isfile(upload_path_student):
+                return send_file(upload_path_student, as_attachment=True)
+
+
+    folder_path = './uploads'
+    
+    # 在目标文件夹中查找与提供的文件名匹配的文件
+    matching_files = [file for file in os.listdir(folder_path) if file.startswith(filename)]
+    
+    if len(matching_files) > 0:
+        # 使用匹配到的第一个文件进行下载
+        file_path = os.path.join(folder_path, matching_files[0])
+        return send_file(file_path, as_attachment=True)   
 
 
 
@@ -437,6 +509,9 @@ def delete_file(filename):
         os.remove(processed_path)
         end = time.time()
         spend = round(end - start,3)
+
+        threading.Thread(target=save_file_stats).start()
+
         return jsonify({'message': 'File {} deleted successfully.'.format(filename),'spend':spend})
     
     else:
@@ -470,11 +545,19 @@ def delete_file_student(filename,studentId):
 
 @app.route('/stats', methods=['GET'])
 def get_file_stats():
-  
+    with open('./stats.json', 'r') as file:
+        stats = json.load(file)
 
+    return stats
+
+#每次调用路由处理函数时，统计信息将被重新计算并保存到文件中。
+# 您可以在其他地方读取该文件，以随时获取统计信息，而无需每次重新计算。
+
+def save_file_stats():
     file_count = 0
     total_size_mb = 0
     total_chars = 0
+    
     for filename in os.listdir('./uploads'):
         file_path = os.path.join('./uploads', filename)
         if os.path.isfile(file_path):
@@ -482,13 +565,40 @@ def get_file_stats():
             total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
             total_chars +=  len(read_text('uploads/' + filename))
     
-  
-    return jsonify({'embedding_num': file_count, 'embedding_size': round(total_size_mb,3),'embedding_textNum':total_chars})
+    stats = {
+        'embedding_num': file_count,
+        'embedding_size': round(total_size_mb, 3),
+        'embedding_textNum': total_chars
+    }
     
+    with open('./stats.json', 'w') as file:
+        json.dump(stats, file)
+
+
 @app.route('/student/<studentId>/stats', methods=['GET'])
 def get_file_stats_student(studentId):
-  
+    stats = {
+        'embedding_num': 0,
+        'embedding_size': 0,
+        'embedding_textNum': 0
+    }
+    folder_path = f'./{studentId}'
+    file_path = os.path.join(folder_path, 'stats.json')
 
+    if not os.path.exists(file_path):
+        return stats
+
+    try:
+        with open(file_path, 'r') as file:
+            stats = json.load(file)
+        return stats
+    except (IOError, json.JSONDecodeError) as e:
+        print(f"Error reading stats file: {e}")
+        return stats
+
+
+
+def save_file_stats_student(studentId):
     file_count = 0
     total_size_mb = 0
     total_chars = 0
@@ -508,9 +618,21 @@ def get_file_stats_student(studentId):
             total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
             total_chars +=  len(read_text(file_path))
     
-  
-    return jsonify({'embedding_num': file_count, 'embedding_size': round(total_size_mb,3),'embedding_textNum':total_chars})
-    
+    stats = {
+        'embedding_num': file_count,
+        'embedding_size': round(total_size_mb, 3),
+        'embedding_textNum': total_chars
+    }
+
+    folder_path = f'./{studentId}'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    file_path = os.path.join(folder_path, 'stats.json')
+
+    with open(file_path, 'w') as file:
+        json.dump(stats, file)
+
 
 
 app.run(host='0.0.0.0',port=8083,debug=True)

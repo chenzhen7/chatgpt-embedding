@@ -181,6 +181,115 @@ from utils.embedding_utils import request_for_danvinci003
 from file_to_scraped import file_add_embedding,read_text,files_to_embeddings
 import traceback
 
+import PyPDF2
+ 
+# 使用open的‘rb’方法打开pdf文件，使用二进制模式
+# mypdf = open('uploads\试论大学生就业心理素质的培养_刘小青.pdf',mode='rb')
+ 
+# # 调用PdfFileReader函数
+# pdf_document = PyPDF2.PdfReader(mypdf)
+ 
+# # 使用PdfFileReader对象的变量，获取各个信息，如numPages属性获取PDF文档的页数
+# # pdf_document.numPages  
+ 
+# # 调用PdfFileReader对象的getPage()方法，传入页码，取得Page对象：输出PDF文档的第一页内容
+# first_page = pdf_document.pages[1]
+ 
+# # 调用Page对象的extractText()方法，返回该页文本的字符串
+# text = first_page.extract_text()
+from io import StringIO
+from io import open
+# from pdfminer.converter import TextConverter
+# from pdfminer.layout import LAParams
+# from pdfminer.pdfinterp import PDFResourceManager, process_pdf
+
+# def save_file_stats_student(studentId):
+#     file_count = 0
+#     total_size_mb = 0
+#     total_chars = 0
+#     for filename in os.listdir('./uploads'):
+#         file_path = os.path.join('./uploads', filename)
+#         if os.path.isfile(file_path):
+#             file_count += 1
+#             total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+#             total_chars +=  len(read_text('uploads/' + filename))
+
+#     upload_folder = os.path.join('./uploads',studentId)
+
+#     for filename in os.listdir(upload_folder):
+#         file_path = os.path.join(upload_folder, filename)
+#         if os.path.isfile(file_path):
+#             file_count += 1
+#             total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+#             total_chars +=  len(read_text(file_path))
+    
+#     stats = {
+#         'embedding_num': file_count,
+#         'embedding_size': round(total_size_mb, 3),
+#         'embedding_textNum': total_chars
+#     }
+
+#     folder_path = f'./{studentId}'
+#     if not os.path.exists(folder_path):
+#         os.makedirs(folder_path)
+
+#     file_path = os.path.join(folder_path, 'stats.json')
+
+#     with open(file_path, 'w') as file:
+#         json.dump(stats, file)
+
+# save_file_stats_student('20202415')
+
+# file_count = 0
+# total_size_mb = 0
+# total_chars = 0
+
+# for filename in os.listdir('./uploads'):
+#     file_path = os.path.join('./uploads', filename)
+#     if os.path.isfile(file_path):
+#         file_count += 1
+#         total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+#         total_chars +=  len(read_text('uploads/' + filename))
+
+# stats = {
+#     'embedding_num': file_count,
+#     'embedding_size': round(total_size_mb, 3),
+#     'embedding_textNum': total_chars
+# }
+
+# with open('./stats.json', 'w') as file:
+#     json.dump(stats, file)
+
+# input()
+
+# def read_pdf(pdf):
+#     # resource manager
+#     rsrcmgr = PDFResourceManager()
+#     retstr = StringIO()
+#     laparams = LAParams()
+#     # device
+#     device = TextConverter(rsrcmgr, retstr, laparams=laparams)
+#     process_pdf(rsrcmgr, device, pdf)
+#     device.close()
+#     content = retstr.getvalue()
+#     retstr.close()
+#     # 获取所有行
+#     lines = str(content).split("\n")
+#     return lines
+ 
+ 
+ 
+# with open('uploads\试论大学生就业心理素质的培养_刘小青.pdf', "rb") as my_pdf:
+#     print(read_pdf(my_pdf))
+
+# import pdfplumber
+# file_path = r'uploads\试论大学生就业心理素质的培养_刘小青.pdf'
+# with pdfplumber.open(file_path) as pdf:
+#     page = pdf.pages[0]
+#     print(page.extract_text())
+
+
+# input()
 
 # file_count = 0
 # total_size_mb = 0
@@ -190,8 +299,8 @@ import traceback
 #     if os.path.isfile(file_path):
 #         file_count += 1
 #         total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
-from utils.embedding_utils import request_for_ChatCompletion
-
+# from utils.embedding_utils import request_for_ChatCompletion
+# ======================###########################################
 # messages = [{"role": "user", "content": "你好"}]
 #         #使用问题和上下文创建一个Completion
 # response = request_for_ChatCompletion(
@@ -201,8 +310,9 @@ from utils.embedding_utils import request_for_ChatCompletion
 # res =  response["choices"][0]["message"]["content"]
 # print(res)
 
-
-# folder_path = './processed'
+# input()
+#######################################################################
+# # folder_path = './processed'
 # for file_name in os.listdir(folder_path):
 #     if file_name.endswith('.csv'):
 #         file_path = os.path.join(folder_path, file_name)
@@ -262,8 +372,8 @@ import re
     
 #     return ','.join(formatted_row_data)
 
-
-
+df = pd.read_excel("01.xlsx")
+input()
 import pandas as pd
 import numpy as np
 import re
