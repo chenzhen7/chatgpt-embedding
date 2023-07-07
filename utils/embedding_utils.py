@@ -17,10 +17,14 @@ embedding_encoding = "cl100k_base"  # this the encoding for text-embedding-ada-0
 max_tokens = 500 # the maximum for text-embedding-ada-002 is 8191
 #加载cl100k_base编码，该编码设计用于ada-002模型
 tokenizer = tiktoken.get_encoding(embedding_encoding)
-apikey = "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"
+apikey = "sk-SALfMinwnchiY8vDN10VT3Blbk
+FJGFi4ZNlaLucniEcwKy6h"
 embedding_url = "https://api.openai-proxy.com/v1/embeddings"
 embedding_url_me = "https://43.163.223.60/v1/embeddings"
 gpt_3_url_me = "https://43.163.223.60/v1/chat/completions"
+ada_002 = "text-embedding-ada-002"
+ada_doc_001 = "text-search-ada-doc-001"
+text_similarity_davinci_001 = "text-similarity-davinci-001"
 
 #中文的句子分割法
 def split_chinese(text):
@@ -43,7 +47,7 @@ def split_chinese(text):
     return sentences
 
 #请求我的代理获得embeding
-def request_for_embedding(input,engine='text-embedding-ada-002'):
+def request_for_embedding(input,engine="text-search-ada-doc-001"):
 
     # 设置请求头部信息
     headers = {
@@ -124,7 +128,7 @@ def request_for_danvinci003(prompt,temperature,max_tokens,top_p,frequency_penalt
 
     return response.json()
 
-def request_for_ChatCompletion(messages,model='gpt-3.5-turbo',temperature=1,max_tokens=2048):
+def request_for_ChatCompletion(messages,model='gpt-3.5-turbo-0613',temperature=0.5,max_tokens=2048):
     # 设置请求头部信息
     headers = {
         'Content-Type': 'application/json',

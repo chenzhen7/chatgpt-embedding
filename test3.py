@@ -7,6 +7,7 @@ import pandas as pd
 import tiktoken
 import matplotlib.pyplot as plt
 import json
+from utils.embedding_utils import request_for_ChatCompletion
 
 # embedding model parameters
 embedding_model = "text-embedding-ada-002"
@@ -16,6 +17,42 @@ max_tokens = 8000  # the maximum for text-embedding-ada-002 is 8191
 
 #加载cl100k_base编码，该编码设计用于ada-002模型
 tokenizer = tiktoken.get_encoding(embedding_encoding)
+
+
+def request_for_ChatCompletion(messages,apiKey,proxy,model='gpt-3.5-turbo-0613',temperature=0.5,max_tokens=2048):
+    # 设置请求头部信息
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + apikey
+    }
+
+    data = {
+        'messages' : messages,
+        'model' : model,
+        'temperature' : temperature,
+        'max_tokens' : max_tokens
+    }
+# 发送 POST 请求
+    print("post for https://api.openai-proxy.com/v1/chat/completions")
+    response = requests.post(proxy, headers=headers, data=json.dumps(data),verify=False)
+    
+    return response.json()
+
+apikey = "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"
+gpt_3_url_me = "https://43.163.223.60/v1/chat/completions"
+
+
+print(request_for_ChatCompletion("你好",apiKey="sk-D43Xy6nbnLlmjbyE166P
+T3BlbkFJlf0SeWxiULsb6YB5k3lS",proxy=gpt_3_url_me))
+
+
+
+
+
+
+
+
+
 
 #读取名为 scraped.csv 的 CSV 文件，其中 index_col=0 参数指定第一列为索引列。该文件将 DataFrame 对象 df 中。
 # df = pd.read_csv('processed/scraped.csv', index_col=0)
@@ -371,93 +408,136 @@ import re
 
     
 #     return ','.join(formatted_row_data)
+# df = pd.DataFrame()
 
-df = pd.read_excel("01.xlsx")
-input()
-import pandas as pd
-import numpy as np
-import re
-import pandas as pd
-import numpy as np
-import re
-import pandas as pd
-import numpy as np
-import re
+# if df.empty:
+#     print("df")
+# else:
+#     print('null')
+# df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
+####################################################################
+# import urllib.parse
+# import requests
+# from bs4 import BeautifulSoup
 
-def excelToMd(file_path, nan_replacement="-"):
-    # 读取Excel文件
-    df = pd.read_excel(file_path)
-    
-    # 删除空的列
-    df = df.dropna(axis=1, how='all')
-    
-    # 处理未命名的列名
-    df.columns = ["" if 'Unnamed:' in str(col) else col for col in df.columns]
-    
-    # 获取表格的列名和数据
-    columns_name = df.columns.tolist()[1:]
-    data = df.values.tolist()
-    rows_name = df.iloc[:, 0].tolist()  # 获取第一列作为行名
-    
-    
-    # 构建Markdown表格
-    # markdown_table = '| ' + ' | '.join(columns) + ' |\n'
-    # markdown_table += '| ' + ' | '.join(['---'] * len(columns)) + ' |\n'
-    
-    def clean_cell(cell):
-        # 使用正则表达式替换多个空白字符，并去除首尾空白
-        if not pd.isnull(cell):
-            return re.sub(r'\s+', ' ', str(cell)).strip()
-        else:
-            return nan_replacement
+# from selenium.webdriver.chrome.options import Options
+# from webdriver_helper import debugger, get_webdriver
 
-    table = []
-    for (row,row_name) in zip(data,rows_name):
-        # 处理每一行的数据
-        row_data = []
-        #row[1:]表示每一行的第一个单元格去掉 ，即整张表的第一列不要
-        for (col,cell) in zip(columns_name, row[1:]):
-            if not pd.isnull(cell):
-                #格式化结果
-                cleaned_cell = clean_cell(cell)
-                # 连接行名、列名和单元格值
-                row_name = row_name.strip()
-                cleaned_cell = f'{row_name}-{col}-{cleaned_cell}'
-                row_data.append(cleaned_cell)
-        # 添加到 Markdown 表格中
-        # markdown_table += '| ' + ' | '.join(row_data) + ' |\n'
-        table += row_data
+# chrome_options = Options()
+# chrome_options.add_argument('--headless')
+# driver = get_webdriver(options=chrome_options)
+# driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+#         "source": """
+#             Object.defineProperty(navigator, 'webdriver', {
+#             get: () => undefined
+#             })
+#         """
+#         })
+# # 发起 HTTP 请求获取网页内容
+# headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.25 Safari/537.36 Core/1.70.3880.400 QQBrowser/10.8.4554.400 '}
+# url = 'https://blog.csdn.net/BAZHUAYUdata/article/details/100742793?utm_medium=distribute.pc_relevant.none-task-blog-2~default~baidujs_utm_term~default-0-100742793-blog-118634078.235^v38^pc_relevant_anti_t3&spm=1001.2101.3001.4242.1&utm_relevant_index=3'  # 替换为你要爬取的网页的 URL
+# driver.get(url)
+# html_content = driver.page_source
+# # response = requests.get(url,headers=headers)
+# # html_content = response.text
+# # print("response" , response)
+# print("html_content" , html_content.strip())
+
+# # 使用 BeautifulSoup 解析网页内容并提取文本
+# soup = BeautifulSoup(html_content, 'html.parser')
+# text = soup.get_text()
+
+# # 打印文本内容
+# print(text.replace(" ","").replace("\n",""))
+
+# # 关闭浏览器
+# driver.quit()
+# input("完成")
+# import pandas as pd
+# import numpy as np
+# import re
+# import pandas as pd
+# import numpy as np
+# import re
+# import pandas as pd
+# import numpy as np
+# import re
+####################################################################
+
+# def excelToMd(file_path, nan_replacement="-"):
+#     # 读取Excel文件
+#     df = pd.read_excel(file_path)
+    
+#     # 删除空的列
+#     df = df.dropna(axis=1, how='all')
+    
+#     # 处理未命名的列名
+#     df.columns = ["" if 'Unnamed:' in str(col) else col for col in df.columns]
+    
+#     # 获取表格的列名和数据
+#     columns_name = df.columns.tolist()[1:]
+#     data = df.values.tolist()
+#     rows_name = df.iloc[:, 0].tolist()  # 获取第一列作为行名
+    
+    
+#     # 构建Markdown表格
+#     markdown_table = '| ' + ' | '.join(columns) + ' |\n'
+#     markdown_table += '| ' + ' | '.join(['---'] * len(columns)) + ' |\n'
+    
+#     def clean_cell(cell):
+#         # 使用正则表达式替换多个空白字符，并去除首尾空白
+#         if not pd.isnull(cell):
+#             return re.sub(r'\s+', ' ', str(cell)).strip()
+#         else:
+#             return nan_replacement
+
+#     table = []
+#     for (row,row_name) in zip(data,rows_name):
+#         # 处理每一行的数据
+#         row_data = []
+#         #row[1:]表示每一行的第一个单元格去掉 ，即整张表的第一列不要
+#         for (col,cell) in zip(columns_name, row[1:]):
+#             if not pd.isnull(cell):
+#                 #格式化结果
+#                 cleaned_cell = clean_cell(cell)
+#                 # 连接行名、列名和单元格值
+#                 row_name = row_name.strip()
+#                 cleaned_cell = f'{row_name}-{col}-{cleaned_cell}'
+#                 row_data.append(cleaned_cell)
+#         # 添加到 Markdown 表格中
+#         # markdown_table += '| ' + ' | '.join(row_data) + ' |\n'
+#         table += row_data
 
 
     
-    return '\n'.join(table)
+#     return '\n'.join(table)
 
 
-markdown_table = excelToMd("01.xlsx")
+# markdown_table = excelToMd("01.xlsx")
 # 将Markdown表格写入文件
-with open('mk.txt', 'w', encoding='utf-8') as f:
-    f.write(markdown_table)
+# with open('mk.txt', 'w', encoding='utf-8') as f:
+#     f.write(markdown_table)
 
-print("Markdown表格已写入到mk.txt文件中。")
-
-
+# print("Markdown表格已写入到mk.txt文件中。")
 
 
 
-def excelToTxt(file_path):
-    # 读取Excel文件并填充缺失值
-    df = pd.read_excel(file_path)
-    df = df.fillna('')  # 将缺失值替换为空字符串
-
-    # 转换为文本格式
-    text_data = df.to_string(index=False)
-
-    # 将文本内容写入文件
-    with open('excel.txt', 'w', encoding='utf-8') as f:
-        f.write(text_data)
-
-    print("Excel表格内容已写入到excel.txt文件中。")
 
 
-file_path = '01.xlsx'  # 替换为实际的Excel文件路径
-excelToTxt(file_path)
+# def excelToTxt(file_path):
+#     # 读取Excel文件并填充缺失值
+#     df = pd.read_excel(file_path)
+#     df = df.fillna('')  # 将缺失值替换为空字符串
+
+#     # 转换为文本格式
+#     text_data = df.to_string(index=False)
+
+#     # 将文本内容写入文件
+#     with open('excel.txt', 'w', encoding='utf-8') as f:
+#         f.write(text_data)
+
+#     print("Excel表格内容已写入到excel.txt文件中。")
+
+
+# file_path = '01.xlsx'  # 替换为实际的Excel文件路径
+# excelToTxt(file_path)

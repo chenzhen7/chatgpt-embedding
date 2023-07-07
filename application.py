@@ -15,13 +15,17 @@ from utils.embedding_utils import request_for_danvinci003,request_for_ChatComple
 from file_to_scraped import file_add_embedding,read_text,files_to_embeddings
 import traceback
 import threading
-import chardet
-
+from bs4 import BeautifulSoup
+import hashlib
 lock = threading.Lock()
+from selenium.webdriver.chrome.options import Options
+from webdriver_helper import debugger, get_webdriver
 app = Flask(__name__)
+import re
 CORS(app)
 
-apikey = "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"
+apikey = "sk-SALfMinwnchiY8vDN10VT3Bl
+bkFJGFi4ZNlaLucniEcwKy6h"
 
 
 # #请求我的代理获得embeding
@@ -59,6 +63,10 @@ def create_context(
     # question = " ".join([w for w in list(jb.cut(question))])
     # print("question",question)
     #获取问题的embeddings
+    if df.empty:
+        print("df 为空")
+        return "空",[]
+
     try:
         resp_embedding = request_for_embedding(input=question, engine='text-embedding-ada-002')
         q_embeddings = resp_embedding
@@ -77,7 +85,7 @@ def create_context(
     context = []
     filenames = []
     cur_len = 0
-
+ 
     #按距离排序，并将文本添加到上下文中，直到上下文太长
     for i, row in df.sort_values('distances', ascending=True).iterrows():
         
@@ -139,9 +147,9 @@ def answer_question(
     # except Exception:
     #     print(response)
 
-    # gpt 3.5
+    # gpt 3.5请你仔细阅读上文的所有内容然后回答问题：我周一上什么课？如果不能根据上文回答, 说 \"很抱歉!我不知道\"\n\n
     try:
-        messages = [{"role": "user", "content": f"根据下面的上下文回答问题，如果不能根据上下文回答, 说 \"很抱歉!我不知道\"\n\n上下文: {context}\n\n---\n\n问题: {question}\n回答:"}]
+        messages = [{"role": "user", "content": f"{context}\n\n---\n\n请你仔细阅读上文的所有内容然后回答问题：{question}，如果不能根据上文回答, 说 \"很抱歉!我不知道\"\n\n"}]
         #使用问题和上下文创建一个Completion
         response = request_for_ChatCompletion(
             messages=messages, 
@@ -188,24 +196,51 @@ def allowed_file(filename):
 def get_ss():
     # 获取开始时间
     start = time.time()
+    switchNameList = request.json.get('switchNameList')
+    print("switchNameList = " + ','.join(switchNameList))
+
+    switchNameList_without_extension = [os.path.splitext(filename)[0] for filename in switchNameList]
 
     # df = pd.read_csv('./processed/embeddings.csv', index_col=0)
     # 遍历 processed 文件夹中的所有文件
     folder_path = './processed'
     df = pd.DataFrame()
     for file_name in os.listdir(folder_path):
-        if file_name.endswith('.csv'):
-            file_path = os.path.join(folder_path, file_name)
-            # 读取 CSV 文件并将其添加到 df
-            df_temp = pd.read_csv(file_path,index_col=0)
-            df_temp['filename'] = os.path.splitext(file_name)[0]
-            df = pd.concat([df, df_temp], ignore_index=True)
-            # 打印合并后的 DataFrame
+        #去掉后缀名比较
+        filename_without_extension = os.path.splitext(file_name)[0]
+        #如果该文件在switchNameList中，则才会引用
+        if filename_without_extension in switchNameList_without_extension:
+            if file_name.endswith('.csv'):
+                file_path = os.path.join(folder_path, file_name)
+                # 读取 CSV 文件并将其添加到 df
+                df_temp = pd.read_csv(file_path,index_col=0)
+                df_temp['filename'] = os.path.splitext(file_name)[0]
+                df = pd.concat([df, df_temp], ignore_index=True)
+                # 打印合并后的 DataFrame
 
-    # 这行代码的目的是将 'embeddings' 列中的字符串转换为对应的对象,然后将这些对象转换为 NumPy 数组
-    df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
-    print(df.head())  # 默认打印前5行
+    folder_path = './processed_urls'
+    for file_name in os.listdir(folder_path):
+        #去掉后缀名比较
+        filename_without_extension = os.path.splitext(file_name)[0]
+        #如果该文件在switchNameList中，则才会引用
+        if filename_without_extension in switchNameList_without_extension:
+            if file_name.endswith('.csv'):
+                file_path = os.path.join(folder_path, file_name)
+                # 读取 CSV 文件并将其添加到 df
+                url_path = os.path.join('./urls', filename_without_extension + '.txt')
 
+                with open(url_path, 'r', encoding='utf-8') as file:
+                    url = file.readline().strip()
+                
+                df_temp = pd.read_csv(file_path,index_col=0)
+                df_temp['filename'] = url
+                df = pd.concat([df, df_temp], ignore_index=True)
+                # 打印合并后的 DataFrame
+
+    if not df.empty:
+        # 这行代码的目的是将 'embeddings' 列中的字符串转换为对应的对象,然后将这些对象转换为 NumPy 数组
+        df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
+        print(df.head())  # 默认打印前5行
 
     end = time.time()
     print("读取embeddings.csv并转化为Numpy数组时间：",  end - start)
@@ -213,13 +248,14 @@ def get_ss():
     # 获取带json串请求的question参数传入的值
     question = request.json.get('question')
     print("question = " + question)
- 
+    
+   
 
     # 获得上下文信息并且找到上下文是来自哪些文件，把这些文件的名字返回
     context,filenames = create_context(
         question,
         df,
-        max_len=1500,
+        max_len=1800,
     )
     filenames = list(set(filenames))
     
@@ -241,8 +277,8 @@ def get_ss():
         'msg': msg,
         'filenames':filenames
     }
-    print("data",data)
 
+    print("data",data)
     return jsonify(data)
 
 
@@ -255,16 +291,26 @@ def get_ss_student():
 
     # df = pd.read_csv('./processed/embeddings.csv', index_col=0)
     # 遍历 processed 文件夹中的所有文件
+    switchNameList = request.json.get('switchNameList')
+    print("switchNameList = " + ','.join(switchNameList))
+
+    switchNameList_without_extension = [os.path.splitext(filename)[0] for filename in switchNameList]
+
     folder_path = './processed'
     df = pd.DataFrame()
     for file_name in os.listdir(folder_path):
-        if file_name.endswith('.csv'):
-            file_path = os.path.join(folder_path, file_name)
-            # 读取 CSV 文件并将其添加到 df
-            df_temp = pd.read_csv(file_path,index_col=0)
-            df_temp['filename'] = os.path.splitext(file_name)[0]
-            df = pd.concat([df, df_temp], ignore_index=True)
-            # 打印合并后的 DataFrame
+        #去掉后缀名比较
+        filename_without_extension = os.path.splitext(file_name)[0]
+        #如果该文件在switchNameList中，则才会引用
+        if filename_without_extension in switchNameList_without_extension:
+            if file_name.endswith('.csv'):
+                file_path = os.path.join(folder_path, file_name)
+                # 读取 CSV 文件并将其添加到 df
+                df_temp = pd.read_csv(file_path,index_col=0)
+                df_temp['filename'] = os.path.splitext(file_name)[0]
+                df = pd.concat([df, df_temp], ignore_index=True)
+                # 打印合并后的 DataFrame
+
 
     # df = pd.read_csv('./processed/embeddings.csv', index_col=0)
     # 遍历 processed 文件夹中的所有文件
@@ -274,18 +320,66 @@ def get_ss_student():
     subfolder_path = os.path.join(folder_path, studentId)
     if os.path.exists(subfolder_path) and os.path.isdir(subfolder_path):
         for file_name in os.listdir(subfolder_path):
+            #去掉后缀名比较
+            filename_without_extension = os.path.splitext(file_name)[0]
+            #如果该文件在switchNameList中，则才会引用
+            if filename_without_extension in switchNameList_without_extension:
+                if file_name.endswith('.csv'):
+                    file_path = os.path.join(subfolder_path, file_name)
+                    # 读取 CSV 文件并将其添加到 df
+                    df_temp = pd.read_csv(file_path, index_col=0)
+                    df_temp['filename'] = os.path.splitext(file_name)[0]
+                    df = pd.concat([df, df_temp], ignore_index=True)
+
+
+    
+    folder_path = './processed_urls'
+    for file_name in os.listdir(folder_path):
+        #去掉后缀名比较
+        filename_without_extension = os.path.splitext(file_name)[0]
+        #如果该文件在switchNameList中，则才会引用
+        if filename_without_extension in switchNameList_without_extension:
             if file_name.endswith('.csv'):
-                file_path = os.path.join(subfolder_path, file_name)
+                file_path = os.path.join(folder_path, file_name)
                 # 读取 CSV 文件并将其添加到 df
-                df_temp = pd.read_csv(file_path, index_col=0)
-                df_temp['filename'] = os.path.splitext(file_name)[0]
+                url_path = os.path.join('./urls', filename_without_extension + '.txt')
+
+                with open(url_path, 'r', encoding='utf-8') as file:
+                    url = file.readline().strip()
+                
+                df_temp = pd.read_csv(file_path,index_col=0)
+                df_temp['filename'] = url
                 df = pd.concat([df, df_temp], ignore_index=True)
+                # 打印合并后的 DataFrame
+
+    folder_path = './processed_urls'
+    subfolder_path = os.path.join(folder_path, studentId)
+
+    if os.path.exists(subfolder_path) and os.path.isdir(subfolder_path):
+        for file_name in os.listdir(subfolder_path):
+            #去掉后缀名比较
+            filename_without_extension = os.path.splitext(file_name)[0]
+            #如果该文件在switchNameList中，则才会引用
+            if filename_without_extension in switchNameList_without_extension:
+                if file_name.endswith('.csv'):
+                    file_path = os.path.join(subfolder_path, file_name)
+                    # 读取 CSV 文件并将其添加到 df
+                    url_path = os.path.join(f'./urls/{studentId}', filename_without_extension + '.txt')
+
+                    with open(url_path, 'r', encoding='utf-8') as file:
+                        url = file.readline().strip()
+                    
+                    df_temp = pd.read_csv(file_path,index_col=0)
+                    df_temp['filename'] = url
+                    df = pd.concat([df, df_temp], ignore_index=True)
+                    # 打印合并后的 DataFrame
+    
     else:
         print(f"文件夹 {subfolder_path} 不存在")
 
-    
-    # 这行代码的目的是将 'embeddings' 列中的字符串转换为对应的对象,然后将这些对象转换为 NumPy 数组
-    df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
+    if not df.empty:
+        # 这行代码的目的是将 'embeddings' 列中的字符串转换为对应的对象,然后将这些对象转换为 NumPy 数组
+        df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
 
 
     end = time.time()
@@ -318,6 +412,7 @@ def get_ss_student():
         'msg': msg,
         'filenames':filenames
     }
+    
     print("data",data)
     return jsonify(data)
 
@@ -325,11 +420,11 @@ def get_ss_student():
 
 
 UPLOAD_FOLDER = 'uploads'
-
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx','xlsx'}
-
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx','xlsx'}
+DOCUMENT = 0
+URL = 1
 
 
 @app.route('/upload', methods=['POST'])
@@ -366,9 +461,8 @@ def upload_file():
                     traceback.print_exc()
                     print("\n-----------file_add_embedding出错--------------")
                     time.sleep(5)
-
                     continue
-            threading.Thread(target=save_file_stats).start()
+            save_file_stats()
 
         end = time.time()
         spend = round(end - start,3)
@@ -416,7 +510,7 @@ def upload_file_student():
                     time.sleep(5)
 
                     continue
-            threading.Thread(target=save_file_stats_student, args=(studentId,)).start()      
+            save_file_stats_student(studentId)  
 
 
         end = time.time()
@@ -433,7 +527,15 @@ def get_file_list():
         file_path = os.path.join('./uploads', filename)
         if os.path.isfile(file_path):
             file_size_mb = round(Path(file_path).stat().st_size / (1024 * 1024), 2)
-            file_list.append({'filename': filename, 'size': round(file_size_mb,3)})
+            file_list.append({'filename': filename, 'size': round(file_size_mb,3),'type':DOCUMENT})
+
+    for filename in os.listdir('./urls'):
+        file_path = os.path.join('./urls', filename)
+        if os.path.isfile(file_path):
+            with open(file_path, 'r', encoding='utf-8') as file:
+                url = file.readline().strip()
+            file_size_mb = round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+            file_list.append({'filename': filename, 'size': round(file_size_mb,3),'type':URL,'url':url})
 
     return jsonify({'files': file_list})
 
@@ -445,13 +547,27 @@ def get_file_list_student():
     file_list = []
     folder_path = './uploads'
     student_path = os.path.join(folder_path, str(studentId))
+
     if os.path.exists(student_path) and os.path.isdir(student_path):
         for filename in os.listdir(student_path):
             file_path = os.path.join(student_path, filename)
             if os.path.isfile(file_path):
                 file_size_mb = round(Path(file_path).stat().st_size / (1024 * 1024), 2)
-                file_list.append({'filename': filename, 'size': round(file_size_mb,3)})
+                file_list.append({'filename': filename, 'size': round(file_size_mb,3),'type':DOCUMENT})
     
+    folder_path = './urls'
+    student_path = os.path.join(folder_path, str(studentId))
+    if os.path.exists(student_path) and os.path.isdir(student_path):
+        for filename in os.listdir(student_path):
+            file_path = os.path.join(student_path, filename)
+        
+            if os.path.isfile(file_path):
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    url = file.readline().strip()
+                file_size_mb = round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+                file_list.append({'filename': filename, 'size': round(file_size_mb,3),'type':URL,'url':url})
+
+
     return jsonify({'files': file_list})
 
 
@@ -500,22 +616,29 @@ def delete_file(filename):
     start = time.time()
 
     file_path = os.path.join('./uploads', filename)
-
     name_without_extension = os.path.splitext(filename)[0]
     processed_path = os.path.join('./processed', name_without_extension + '.csv')
 
     if os.path.isfile(file_path):
         os.remove(file_path)
         os.remove(processed_path)
-        end = time.time()
-        spend = round(end - start,3)
-
-        threading.Thread(target=save_file_stats).start()
-
-        return jsonify({'message': 'File {} deleted successfully.'.format(filename),'spend':spend})
+   
     
-    else:
-        return "File not found", 404
+    file_path = os.path.join('./urls', filename)
+    name_without_extension = os.path.splitext(filename)[0]
+    processed_path = os.path.join('./processed_urls', name_without_extension + '.csv')
+
+    if os.path.isfile(file_path):
+        os.remove(file_path)
+        os.remove(processed_path)
+    
+    end = time.time()
+    spend = round(end - start,3)
+
+    threading.Thread(target=save_file_stats).start()
+
+    return jsonify({'message': 'File {} deleted successfully.'.format(filename),'spend':spend})
+
 
 
 @app.route('/student/<studentId>/delete/<filename>', methods=['DELETE'])
@@ -534,12 +657,24 @@ def delete_file_student(filename,studentId):
     if os.path.isfile(upload_path_student):
         os.remove(upload_path_student)
         os.remove(processed_path_student)
-        end = time.time()
-        spend = round(end - start,3)
-        return jsonify({'message': 'File {} deleted successfully.'.format(filename),'spend':spend})
     
-    else:
-        return "File not found", 404
+    upload_folder_student = os.path.join('./urls',studentId)
+    upload_path_student = os.path.join(upload_folder_student,filename)
+
+    name_without_extension = os.path.splitext(filename)[0]
+    processed_folder_student = os.path.join('./processed_urls',studentId)
+    processed_path_student = os.path.join(processed_folder_student, name_without_extension + '.csv')
+
+    if os.path.isfile(upload_path_student):
+        os.remove(upload_path_student)
+        os.remove(processed_path_student)
+
+    end = time.time()
+    spend = round(end - start,3)
+    threading.Thread(target=save_file_stats_student, args=(studentId,)).start()   
+
+    return jsonify({'message': 'File {} deleted successfully.'.format(filename),'spend':spend})
+
 
 
 
@@ -564,6 +699,13 @@ def save_file_stats():
             file_count += 1
             total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
             total_chars +=  len(read_text('uploads/' + filename))
+
+    for filename in os.listdir('./urls'):
+        file_path = os.path.join('./urls', filename)
+        if os.path.isfile(file_path):
+            file_count += 1
+            total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+            total_chars +=  len(read_text('urls/' + filename))
     
     stats = {
         'embedding_num': file_count,
@@ -618,6 +760,23 @@ def save_file_stats_student(studentId):
             total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
             total_chars +=  len(read_text(file_path))
     
+    for filename in os.listdir('./urls'):
+        file_path = os.path.join('./urls', filename)
+        if os.path.isfile(file_path):
+            file_count += 1
+            total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+            total_chars +=  len(read_text('urls/' + filename))
+    
+    upload_folder = os.path.join('./urls',studentId)
+
+    for filename in os.listdir(upload_folder):
+        file_path = os.path.join(upload_folder, filename)
+        if os.path.isfile(file_path):
+            file_count += 1
+            total_size_mb += round(Path(file_path).stat().st_size / (1024 * 1024), 2)
+            total_chars +=  len(read_text(file_path))
+
+
     stats = {
         'embedding_num': file_count,
         'embedding_size': round(total_size_mb, 3),
@@ -632,6 +791,155 @@ def save_file_stats_student(studentId):
 
     with open(file_path, 'w') as file:
         json.dump(stats, file)
+
+
+@app.route('/upload_url', methods=['POST'])
+def upload_url():
+    start = time.time()
+
+    url = request.json.get('url')  # 获取请求参数中的 url
+    if not url:
+        return 'Missing URL parameter', 401
+
+    try:
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        driver = get_webdriver(options=chrome_options)
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": """
+                    Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                    })
+                """
+                })
+        # 发起 HTTP 请求获取网页内容
+        driver.get(url)
+        html_content = driver.page_source
+
+        # 使用 BeautifulSoup 解析网页内容并提取文本
+        soup = BeautifulSoup(html_content, 'html.parser')
+        text = soup.get_text()
+        text = re.sub(r' +', ' ', text)
+        text = re.sub(r'\n+', '\n', text)
+        text = re.sub(r'\t+', '\t', text)
+
+        print(repr(text))
+
+        # 将文本保存到 txt 文件
+        url_folder = './urls'
+        if not os.path.exists(url_folder):
+            os.makedirs(url_folder)
+
+        # 使用 MD5 哈希函数生成唯一的文件名
+        hash_object = hashlib.md5(url.encode('utf-8'))
+        file_name = hash_object.hexdigest()
+        file_name += '.txt'
+
+        url_path = os.path.join(url_folder,file_name)
+        with open(url_path, 'w', encoding='utf-8') as file:
+            file.write(url + '\n')  # 写入 URL
+            file.write(text)
+
+        embedding_folder_urls_admin = './processed_urls'
+
+        for i in range(3):
+            try:
+                file_add_embedding(filename=file_name,embedding_folder=embedding_folder_urls_admin,upload_folder=url_folder)
+                break
+            except Exception as e:
+                traceback.print_exc()
+                print("\n-----------file_add_embedding出错--------------")
+                time.sleep(5)
+                continue
+
+        save_file_stats()
+        
+
+        end = time.time()
+        spend = round(end - start,3)
+        return jsonify({'spend': spend,'code':200})
+
+    except Exception as e:
+        return jsonify({'code': 500})
+
+
+@app.route('/student/upload_url', methods=['POST'])
+def upload_url_student():
+    start = time.time()
+
+    url = request.json.get('url')  # 获取请求参数中的 url
+    studentId = request.json.get('studentId')  # 获取请求参数中的 url
+    studentId = str(studentId)
+    if not url:
+        return 'Missing URL parameter', 401
+
+    try:
+        chrome_options = Options()
+        chrome_options.add_argument('--headless')
+        driver = get_webdriver(options=chrome_options)
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": """
+                    Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                    })
+                """
+                })
+        # 发起 HTTP 请求获取网页内容
+        driver.get(url)
+        html_content = driver.page_source
+
+        # 使用 BeautifulSoup 解析网页内容并提取文本
+        soup = BeautifulSoup(html_content, 'html.parser')
+        text = soup.get_text()
+        text = re.sub(r' +', ' ', text)
+        text = re.sub(r'\n+', '\n', text)
+        text = re.sub(r'\t+', '\t', text)
+
+        print(repr(text))
+
+        # 将文本保存到 txt 文件
+        url_folder = './urls'
+        upload_folder_student =  os.path.join(url_folder,studentId)
+        if not os.path.exists(upload_folder_student):
+            os.makedirs(upload_folder_student)
+
+        # 使用 MD5 哈希函数生成唯一的文件名
+        hash_object = hashlib.md5(url.encode('utf-8'))
+        file_name = hash_object.hexdigest()
+        file_name += '.txt'
+
+        url_path = os.path.join(upload_folder_student,file_name)
+        with open(url_path, 'w', encoding='utf-8') as file:
+            file.write(url + '\n')  # 写入 URL
+            file.write(text)
+
+        embedding_folder_urls = './processed_urls'
+        embedding_folder_urls_student = os.path.join(embedding_folder_urls,studentId)
+
+        for i in range(3):
+            try:
+                file_add_embedding(filename=file_name,embedding_folder=embedding_folder_urls_student,upload_folder=upload_folder_student)
+                break
+            except Exception as e:
+                traceback.print_exc()
+                print("\n-----------file_add_embedding出错--------------")
+                time.sleep(5)
+                continue
+            
+        save_file_stats_student(studentId)    
+
+
+        end = time.time()
+        spend = round(end - start,3)
+        return jsonify({'spend': spend,'code':200})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'code': 500})
+
+
+
+
 
 
 

@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from utils.embedding_utils import split_into_many,request_for_embedding,read_text
 import time
 import traceback
+import re
 
 
 # embedding model parameters
@@ -36,7 +37,7 @@ def files_to_embeddings(floders_path:str):
     df = pd.DataFrame(texts, columns = ['fname', 'text'])
 
     #将文本列设置为删除换行符后的原始文本
-    df['text'] = df['fname'] + ". " + remove_newlines(df.text)
+    df['text'] = df['fname'] + "\n" + remove_newlines(df.text)
     # df.to_csv('processed/scraped.csv')
     df.columns = ['title', 'text']  
     df['n_tokens'] = df.text.apply(lambda x: len(tokenizer.encode(x)))
@@ -84,8 +85,9 @@ def file_add_embedding(upload_folder:str,embedding_folder:str,filename:str):
 
     text = read_text(uploadpath)
     # 这行代码的目的是将文本 text 进行分词，并将分词后的词语通过空格连接成一个新的字符串。
-    text = text.replace(' ', '')
-    text = text.replace('\n\n', '\n')
+    text = re.sub(r' +', ' ', text)
+    text = re.sub(r'\n+', '\n', text)
+    text = re.sub(r'\t+', '\t', text)
     text = " ".join([w for w in list(jb.cut(text))])
     texts.append((filename, text))
 
@@ -94,7 +96,7 @@ def file_add_embedding(upload_folder:str,embedding_folder:str,filename:str):
     df = pd.DataFrame(texts, columns = ['fname', 'text'])
 
     #将文本列设置为删除换行符后的原始文本
-    df['text'] = df['fname'] + ". " + df.text
+    df['text'] = df['fname'] + "\n" + df.text
     #不写入 直接添加到embedding
     # df.to_csv('processed/scraped.csv')
     tokenizer = tiktoken.get_encoding(embedding_encoding)

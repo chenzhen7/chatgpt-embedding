@@ -1,0 +1,166 @@
+https://www.chenzhen.space/blog/39
+
+Axios的使用
+ChenZhen
+首页
+分类
+流年记
+音乐盒
+留言板
+友人帐
+Prompt库 新⭐
+ChatGPT
+关于我
+登录
+Axios的使用
+原创
+ChenZhen
+2023-03-22 14:58
+HTML、CSS
+ 158
+1
+axios的基本用法
+axios是一个ajax框架，简化了各种ajax操作，有强大的ajax操作功能。
+其实axios已经用了很多次了，但是每次用之前都会忘记一些内容，做项目途中经常要去网上查axios的一些用法，这次记得了结果下一次又忘了。。。。
+很多基础的东西也都忘了，由于之前一直使用的是渲染模板引擎Thymeleaf连最基本的"session只存在于后端"都能忘。每一个axios请求都是不同的session，所以以前的用session来判断用户，在前后端分离已经不适用了
+这次把经常用到的东西整理出来放到这里
+get请求
+// 为给定 ID 的 user 创建请求
+axios.get('/user?ID=12345')
+ .then(function (response) {
+ console.log(response);
+ })
+ .catch(function (error) {
+ console.log(error);
+ });
+// 此处then方法也可以写为：
+axios.get('/user?ID=12345')
+ .then(res => {
+ console.log('数据是:', res);
+ })
+ .catch(function (error) {
+ console.log(error);
+ });
+ 
+// 上面的请求也可以这样做
+axios.get('/user', {
+ params: {
+ ID: 12345
+ }
+ })
+ .then(function (response) {
+ console.log(response);
+ })
+ .catch(function (error) {
+ console.log(error);
+ });
+post请求
+xios.post('/user', {
+ firstName: 'Fred',
+ lastName: 'Flintstone'
+ })
+ .then(function (response) {
+ console.log(response);
+ })
+ .catch(function (error) {
+ console.log(error);
+ });
+注意：此处请求与jQuery完全不同。
+jQuery如果按照此处直接传json对象的参数的话，后台应该使用request.getParameter方式接收，也就是说默认为表单提交类型，即application/x-www-form-urlencoded，如果是对象，后台springmvc中直接使用对象接收即可。
+axios如果直接传json对象，默认认为是json格式传参，即application/json，也就是以流的形式提交，后台必须使用@RequestBody方式接收参数。
+如果想使用普通的post传参，有两种方式：
+// 1、使用?号
+axios.post("http://localhost:8080/add?id=3&name=mary&sex=n").then(function(resp){
+	if(resp.data.code == "10000"){
+	alert(JSON.stringify(resp.data.data));
+	}else{
+	alert(resp.data.desc);
+	}
+	
+	});
+// 使用params
+// 如果使用普通的post传参，需要使用第三个参数才能用params的方式
+	axios.post("http://localhost:8080/add", null, {
+	params:{
+	id:2,
+	name:"张三",
+	sex:"男"
+	}
+	}).then(function(resp){
+	if(resp.data.code == "10000"){
+	alert(JSON.stringify(resp.data.data));
+	}else{
+	alert(resp.data.desc);
+	}
+	});
+并发请求
+// 执行多个并发请求
+function getUserAccount() {
+ return axios.get('/user/12345');
+}
+function getUserPermissions() {
+ return axios.get('/user/12345/permissions');
+}
+axios.all([getUserAccount(), getUserPermissions()])
+ .then(axios.spread(function (acct, perms) {
+ // 两个请求现在都执行完成
+ }));
+同时进行多个请求，并统一处理返回值
+axios.all(iterable)
+axios.spread(callback)
+例：
+axios.all([
+ axios.post('/add',{name:'wq',age:20}),
+ axios.detete('/delete',{id:1})
+]).then(axios.spread((add, del) => {
+ console.log(add, del);
+axios的参数配置
+axios({
+ method: 'get', // post、get、put....
+ baseURL: '', // 请求的域名，基本地址，公共的路径
+ url: '', // 请求的路径
+ params: {}, // get参数会将请求参数拼接在url上
+ data: {}, // post会将请求参数放在请求体中
+ headers: {}, // 设置请求头，例如设置token等
+ timeout: 1000, // 设置请求超时时长，单位：ms
+})
+其他写法 注：参数带[]表示不是必填参数,没有[]表示是必填参数
+axios.request(config)
+axios.get(url, [config])
+axios.post(url, [data], [config]])
+end
+赞赏
+支付宝
+微信
+作者：chenzhen（联系作者）
+更新时间：2023-03-22 14:58
+版权声明：自由转载-非商用-非衍生-保持署名（创意共享3.0许可证）
+转载声明：如果是转载栈主转载的文章，请附上原文链接
+公众号转载：请在文末添加作者公众号二维码（公众号二维码见右边，欢迎关注）
+评论
+Eason
+2023-04-16 01:55
+123
+回复
+发布
+ 
+新增邮件回复功能，回复将会通过邮件形式提醒，请填写有效的邮件！
+目录
+评论
+axios的基本用法get请求post请求并发请求axios的参数配置
+联系我
+Email：1583296383@qq.com
+QQ：1583296383
+微信
+QQ
+客栈信息
+ 文章总数： 23 篇
+ 
+ 访问总数： 27209 次
+ 
+ 评论总数： 29 条
+ 
+ 留言总数： 51 条
+ 
+我的客栈已营业：0年276天5时6分33秒 (*๓´╰╯`๓)
+粤ICP备2022122083号-1
